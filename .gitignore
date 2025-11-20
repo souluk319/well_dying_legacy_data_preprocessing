@@ -15,3 +15,9 @@ ENV/
 ._*
 .Spotlight-V100
 .Trashes
+
+# 환경 변수
+.env
+
+# 벡터 DB
+chroma_db/
