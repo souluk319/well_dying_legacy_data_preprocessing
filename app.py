@@ -6,18 +6,18 @@ Streamlit을 사용한 간단한 웹 UI
 """
 
 import streamlit as st
-from rag_chatbot import chat
+from rag_chatbot_langgraph import chat
 import time
 
 # 페이지 설정
 st.set_page_config(
-    page_title="Well Dying 유산상속 상담",
+    page_title="Well Dying 유산 관련 상담 챗봇 테스트",
     page_icon="💬",
     layout="wide"
 )
 
 # 제목
-st.title("💬 Well Dying 유산상속 상담 챗봇")
+st.title("💬 Well Dying 유산상속 상담 챗봇 (LangGraph)")
 st.markdown("---")
 
 # 세션 상태 초기화
@@ -47,11 +47,16 @@ if prompt := st.chat_input("유산상속에 대해 궁금한 점을 물어보세
     with st.chat_message("user"):
         st.markdown(prompt)
     
+    # 세션 ID 생성 (없으면)
+    if "thread_id" not in st.session_state:
+        import uuid
+        st.session_state.thread_id = str(uuid.uuid4())
+
     # Assistant 답변 생성
     with st.chat_message("assistant"):
         with st.spinner("검색 중..."):
             try:
-                result = chat(prompt)
+                result = chat(prompt, thread_id=st.session_state.thread_id)
                 
                 # 답변 표시
                 st.markdown(result['answer'])

@@ -212,7 +212,7 @@ def clean_law_body(body: str, article_id: str) -> str:
     return body
 
 # === 법령형(제000조) 청킹 ===
-def chunk_law(text: str, source_file: str, category: str, id_prefix: str, max_chunk_size: int = 1200):
+def chunk_law(text: str, source_file: str, category: str, id_prefix: str, max_chunk_size: int = 1200, overlap: int = 100):
     """
     법령 문서를 "제000조" 형식 기준으로 청킹합니다.
     너무 긴 조문은 추가로 문단 단위로 분할합니다.
@@ -290,7 +290,8 @@ def chunk_law(text: str, source_file: str, category: str, id_prefix: str, max_ch
                         # 먼저 현재 버퍼 저장
                         if buf:
                             sub_chunks.append(buf)
-                            buf = ""
+                            # 오버랩을 위해 버퍼의 뒷부분을 남김
+                            buf = buf[-overlap:] if overlap > 0 else ""
                         
                         # 문장 단위로 분할 (한글 마침표, 숫자 마침표 등)
                         # 단, 날짜 형식(예: "2017. 12. 19.")이나 태그(예: "<개정 ...>")는 보호
@@ -346,19 +347,24 @@ def chunk_law(text: str, source_file: str, category: str, id_prefix: str, max_ch
                                         else:
                                             if buf:
                                                 sub_chunks.append(buf)
-                                            buf = part
+                                            buf = part # 오버랩 적용 안함 (너무 짧은 단위라 복잡도 증가 우려)
                             elif len(buf) + len(sent) + 1 <= 500:
                                 buf = (buf + " " + sent).strip() if buf else sent
                             else:
                                 if buf:
                                     sub_chunks.append(buf)
-                                buf = sent
+                                    # 오버랩 적용
+                                    buf = (buf[-overlap:] + " " + sent).strip() if overlap > 0 else sent
+                                else:
+                                    buf = sent
                     elif len(buf) + len(para) + 2 <= 500:
                         buf = (buf + "\n\n" + para).strip() if buf else para
                     else:
                         # 버퍼가 있으면 저장하고 새로 시작
                         if buf:
                             sub_chunks.append(buf)
+                            # 오버랩 적용
+                            buf = buf[-overlap:] if overlap > 0 else ""
                         # 문단 자체가 500자 초과면 문장 단위로 분할
                         if len(para) > 500:
                             sentences = re.split(r'([.!?。]\s+|\.\s+)', para)
@@ -506,7 +512,7 @@ def chunk_law(text: str, source_file: str, category: str, id_prefix: str, max_ch
     return chunks
 
 # === 심플 문단+길이 청킹 ===
-def chunk_simple(text: str, source_file: str, category: str, id_prefix: str):
+def chunk_simple(text: str, source_file: str, category: str, id_prefix: str, overlap: int = 100):
     """
     일반 문서를 문단 기준으로 청킹합니다.
     - 최소 길이: 300자
@@ -526,7 +532,12 @@ def chunk_simple(text: str, source_file: str, category: str, id_prefix: str):
             # 먼저 현재 버퍼 저장
             if buf and len(buf) >= min_len:
                 chunks.append(buf)
-            buf = ""
+                # 오버랩 적용
+                buf = buf[-overlap:] if overlap > 0 else ""
+            elif buf: # min_len보다 작으면 그냥 둠 (오버랩 X, 이어붙이기)
+                 pass
+            else:
+                 buf = ""
             
             # 문장 단위로 분할
             sentences = re.split(r'([.!?。]\s+|\.\s+)', p)
@@ -550,19 +561,28 @@ def chunk_simple(text: str, source_file: str, category: str, id_prefix: str):
                             else:
                                 if buf and len(buf) >= min_len:
                                     chunks.append(buf)
-                                buf = part
+                                    # 오버랩 적용
+                                    buf = (buf[-overlap:] + " " + part).strip() if overlap > 0 else part
+                                else:
+                                    buf = part
                 elif len(buf) + len(sent) + 1 <= 500:
                     buf = (buf + " " + sent).strip() if buf else sent
                 else:
                     if buf and len(buf) >= min_len:
                         chunks.append(buf)
-                    buf = sent
+                        # 오버랩 적용
+                        buf = (buf[-overlap:] + " " + sent).strip() if overlap > 0 else sent
+                    else:
+                        buf = sent
         elif len(buf) + len(p) + 1 <= 500:
             buf = (buf + " " + p).strip()
         else:
             if len(buf) >= min_len:
                 chunks.append(buf)
-            buf = p
+                # 오버랩 적용
+                buf = (buf[-overlap:] + " " + p).strip() if overlap > 0 else p
+            else:
+                buf = p
 
     if buf and len(buf) >= min_len:
         chunks.append(buf)
